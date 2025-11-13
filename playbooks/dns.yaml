@@ -1,0 +1,76 @@
+---
+- hosts: dns
+  become: yes
+  tasks:
+    - name: Install BIND9
+      apt:
+        name: [bind9, dnsutils]
+        state: present
+        update_cache: yes
+
+    - name: Generate TSIG key for DDNS
+      command: tsig-keygen -a hmac-sha256 ddns-key
+      register: tsig_output
+      args:
+        creates: /etc/bind/ddns.key
+
+    - name: Save TSIG key
+      copy:
+        content: "{{ tsig_output.stdout }}"
+        dest: /etc/bind/ddns.key
+        owner: bind
+        group: bind
+        mode: '0640'
+
+    - name: Configure BIND zones
+      copy:
+        dest: /etc/bind/named.conf.local
+        content: |
+          include "/etc/bind/ddns.key";
+
+          zone "example.test" {
+              type master;
+              file "/etc/bind/db.example.test";
+              allow-update { key "ddns-key"; };
+          };
+
+          zone "58.168.192.in-addr.arpa" {
+              type master;
+              file "/etc/bind/db.192";
+              allow-update { key "ddns-key"; };
+          };
+
+    - name: Create forward zone file
+      copy:
+        dest: /etc/bind/db.example.test
+        content: |
+          $TTL 604800
+          @   IN  SOA dns.example.test. admin.example.test. (
+                  2
+                  604800
+                  86400
+                  2419200
+                  604800 )
+          @       IN  NS      dns.example.test.
+          dns     IN  A       192.168.58.10
+          dhcp    IN  A       192.168.58.20
+
+    - name: Create reverse zone file
+      copy:
+        dest: /etc/bind/db.192
+        content: |
+          $TTL 604800
+          @   IN  SOA dns.example.test. admin.example.test. (
+                  2
+                  604800
+                  86400
+                  2419200
+                  604800 )
+          @       IN  NS      dns.example.test.
+          10      IN  PTR     dns.example.test.
+          20      IN  PTR     dhcp.example.test.
+
+    - name: Restart BIND9
+      service:
+        name: bind9
+        state: restarted

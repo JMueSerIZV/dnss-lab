@@ -1,0 +1,12 @@
+---
+- hosts: cliente
+  become: yes
+  tasks:
+    - name: Install networking tools
+      apt:
+        name: [net-tools, dnsutils]
+        state: present
+        update_cache: yes
+
+    - name: Request DHCP lease
+      command: dhclient -v

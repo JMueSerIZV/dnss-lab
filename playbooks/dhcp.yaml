@@ -1,0 +1,57 @@
+---
+- hosts: dhcp
+  become: yes
+  tasks:
+    - name: Install ISC DHCP server
+      apt:
+        name: isc-dhcp-server
+        state: present
+        update_cache: yes
+
+    - name: Fetch TSIG key from DNS
+      fetch:
+        src: /etc/bind/ddns.key
+        dest: ./ddns.key
+        flat: yes
+      delegate_to: dns
+
+    - name: Copy TSIG key to DHCP server
+      copy:
+        src: ./ddns.key
+        dest: /etc/dhcp/ddns.key
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Configure DHCP for DDNS
+      copy:
+        dest: /etc/dhcp/dhcpd.conf
+        content: |
+          include "/etc/dhcp/ddns.key";
+
+          option domain-name "example.test";
+          option domain-name-servers 192.168.58.10;
+          ddns-update-style interim;
+          ddns-domainname "example.test.";
+          ddns-rev-domainname "58.168.192.in-addr.arpa.";
+
+          subnet 192.168.58.0 netmask 255.255.255.0 {
+              range 192.168.58.100 192.168.58.200;
+              option routers 192.168.58.1;
+              option domain-name-servers 192.168.58.10;
+
+              zone example.test. {
+                  primary 192.168.58.10;
+                  key "ddns-key";
+              }
+
+              zone 58.168.192.in-addr.arpa. {
+                  primary 192.168.58.10;
+                  key "ddns-key";
+              }
+          }
+
+    - name: Restart DHCP service
+      service:
+        name: isc-dhcp-server
+        state: restarted
