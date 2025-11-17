@@ -8,16 +8,9 @@
         state: present
         update_cache: yes
 
-    - name: Fetch TSIG key from DNS
-      fetch:
-        src: /etc/bind/ddns.key
-        dest: ./ddns.key
-        flat: yes
-      delegate_to: dns
-
-    - name: Copy TSIG key to DHCP server
+    - name: Copy TSIG key from shared folder
       copy:
-        src: ./ddns.key
+        src: /vagrant/ddns.key
         dest: /etc/dhcp/ddns.key
         owner: root
         group: root
@@ -50,6 +43,13 @@
                   key "ddns-key";
               }
           }
+
+    - name: Configure DHCP service interfaces
+      copy:
+        dest: /etc/default/isc-dhcp-server
+        content: |
+          INTERFACESv4="eth1"
+          INTERFACESv6=""
 
     - name: Restart DHCP service
       service:

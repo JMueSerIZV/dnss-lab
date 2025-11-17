@@ -1,5 +1,5 @@
 ---
-- hosts: cliente
+- hosts: client
   become: yes
   tasks:
     - name: Install networking tools
@@ -8,5 +8,11 @@
         state: present
         update_cache: yes
 
-    - name: Request DHCP lease
-      command: dhclient -v
+    - name: Bring down eth1
+      command: ip link set eth1 down
+
+    - name: Bring up eth1
+      command: ip link set eth1 up
+
+    - name: Request DHCP lease on eth1
+      command: dhclient -v eth1
